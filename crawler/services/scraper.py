@@ -18,7 +18,7 @@ async def crawler():
     # Run the AI-powered crawler
     async with AsyncWebCrawler(config=browser_config) as crawler:
         result = await crawler.arun(
-            url="https://dev.to/jay_sheth/deploy-host-a-react-application-on-nginx-with-ubuntu-m4l",
+            url="https://www.g2.com/products/bright-data/reviews",
             config=crawler_config
         )
 
