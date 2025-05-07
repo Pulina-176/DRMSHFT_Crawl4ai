@@ -1,34 +1,121 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
-name: Python application
+name: 'Crawl4ai Pipeline'
 
 on:
   push:
-    branches: [ "production" ]
+    branches: [ "main" ]
 
 jobs:
-  build:
+  deploy:
 
     runs-on: ubuntu-latest
 
+    # Use the Bash shell regardless of whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+    - name: Setup AWS connection
+      uses: aws-actions/configure-aws-credentials@v2
       with:
-        python-version: "3.10"
-    - name: Install dependencies
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: 'us-east-1'
+      
+    - name: Check AWS connection
       run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
+        aws sts get-caller-identity
+        
+    # Checkout the repository on the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v4  
+
+    # Check for existing Instance
+    - name: Check for existing instance
+      id: check_instance
       run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
+        INSTANCE_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=dreamshift-crawler" "Name=instance-state-name,Values=running" --query "Reservations[].Instances[].PublicIpAddress" --output text)
+        INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=dreamshift-crawler" "Name=instance-state-name,Values=running" --query "Reservations[].Instances[].InstanceId" --output text)
+        if [ "$INSTANCE_IP" != "" ]; then
+          echo "Existing instance found with Public IP: $INSTANCE_IP"
+          echo "instance_ip=$INSTANCE_IP" >> $GITHUB_OUTPUT
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+        else
+          echo "No existing instance found."
+          echo "instance_ip=None" >> $GITHUB_OUTPUT
+          echo "instance_id=None" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Setup Terraform
+      id: terraform-setup
+      uses: hashicorp/setup-terraform@v2
+
+    # Terraform to create a new EC2 instance if one doesn't exist
+    - name: terraform init & apply
       run: |
-        pytest
+        if [ "${{ steps.check_instance.outputs.instance_ip }}" == "None" ]; then
+          echo "No existing instance found. Proceeding to create a new instance."
+          cd terraform
+          terraform init
+          echo "Creating a new EC2 instance..."
+          terraform apply -auto-approve 
+          echo "Instance created successfully."
+        else
+          echo "Existing instance found. Skipping instance creation."
+        fi
+
+    - name: Wait for instance to be ready
+      run: |
+        INSTANCE_ID="${{ steps.check_instance.outputs.instance_id }}"
+        if [ "$INSTANCE_ID" != "None" ]; then
+          echo "Waiting for instance $INSTANCE_ID to be in running state..."
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+          echo "Instance is now running."
+        fi
+
+    # # SSH into the instance and run the deployment script
+    # - name: SSH into instance and run deployment script
+    #   uses: appleboy/ssh-action@master
+    #   with:
+    #     host: ${{ steps.check_instance.outputs.instance_ip }}
+    #     username: ubuntu
+    #     port: 22
+    #     key: ${{ secrets.EC2_SSH_KEY }}
+    #     script: |
+    #       #!/bin/bash
+    #       echo "Deploying on instance ${{ steps.check_instance.outputs.instance_id }}..."
+
+    #       rm -rf DreamShift-Assist
+    #       mkdir DreamShift-Assist
+    #       cd DreamShift-Assist
+
+    #       # clone the repository using the GitHub PAT
+    #       git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/Chathzaa/DRMSHFT_Fastapi.git
+
+    #       # copy the secrets to the .env file
+    #       cd DRMSHFT_Fastapi/services
+    #       touch .env
+    #       echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" | cat > .env
+    #       echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" | cat >> .env
+    #       echo "ALGORITHM=${{ secrets.ALGORITHM }}" | cat >> .env
+    #       echo "TOKEN_EXPIRY=${{ secrets.TOKEN_EXPIRY }}" | cat >> .env
+
+    #       # Ensure Poetry is in PATH
+    #       export PATH="$HOME/.local/bin:$PATH"
+    #       echo "Poetry path: $(which poetry)"
+    #       poetry --version
+
+    #       # install dependencies
+    #       touch README.md
+    #       poetry lock
+    #       poetry install --no-root
+
+    #       cd backend_api
+          
+    #       # run the rq worker
+    #       nohup poetry run rq worker default > rqworker.log 2>&1 &
+          
+    #       # run the FastAPI server
+    #       nohup poetry run uvicorn server:app --host 0.0.0.0 --port 8000 --reload > app.log 2>&1 &
+
+    #       echo "Deployment script completed."
