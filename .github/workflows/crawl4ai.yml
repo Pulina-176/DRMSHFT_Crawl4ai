@@ -73,49 +73,39 @@ jobs:
           echo "Instance is now running."
         fi
 
-    # # SSH into the instance and run the deployment script
-    # - name: SSH into instance and run deployment script
-    #   uses: appleboy/ssh-action@master
-    #   with:
-    #     host: ${{ steps.check_instance.outputs.instance_ip }}
-    #     username: ubuntu
-    #     port: 22
-    #     key: ${{ secrets.EC2_SSH_KEY }}
-    #     script: |
-    #       #!/bin/bash
-    #       echo "Deploying on instance ${{ steps.check_instance.outputs.instance_id }}..."
+    # SSH into the instance and run the deployment script
+    - name: SSH into instance and run deployment script
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ steps.check_instance.outputs.instance_ip }}
+        username: ubuntu
+        port: 22
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          #!/bin/bash
+          echo "Deploying on instance ${{ steps.check_instance.outputs.instance_id }}..."
 
-    #       rm -rf DreamShift-Assist
-    #       mkdir DreamShift-Assist
-    #       cd DreamShift-Assist
+          rm -rf DreamShift-Crawler
+          mkdir DreamShift-Crawler
+          cd DreamShift-Crawler
 
-    #       # clone the repository using the GitHub PAT
-    #       git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/Chathzaa/DRMSHFT_Fastapi.git
+          # clone the repository using the GitHub PAT
+          git clone https://github.com/Pulina-176/DRMSHFT_Crawl4ai.git
 
-    #       # copy the secrets to the .env file
-    #       cd DRMSHFT_Fastapi/services
-    #       touch .env
-    #       echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" | cat > .env
-    #       echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" | cat >> .env
-    #       echo "ALGORITHM=${{ secrets.ALGORITHM }}" | cat >> .env
-    #       echo "TOKEN_EXPIRY=${{ secrets.TOKEN_EXPIRY }}" | cat >> .env
+          python3 -m venv venv
+          source venv/bin/activate
 
-    #       # Ensure Poetry is in PATH
-    #       export PATH="$HOME/.local/bin:$PATH"
-    #       echo "Poetry path: $(which poetry)"
-    #       poetry --version
-
-    #       # install dependencies
-    #       touch README.md
-    #       poetry lock
-    #       poetry install --no-root
-
-    #       cd backend_api
+          pip install --upgrade pip
+          pip install -r requirements.txt
           
-    #       # run the rq worker
-    #       nohup poetry run rq worker default > rqworker.log 2>&1 &
-          
-    #       # run the FastAPI server
-    #       nohup poetry run uvicorn server:app --host 0.0.0.0 --port 8000 --reload > app.log 2>&1 &
+          crawl4ai-setup
 
-    #       echo "Deployment script completed."
+          cd crawler
+
+          # Kill any process using port 8000
+          fuser -k 8000/tcp || true
+          
+          # run the FastAPI server
+          nohup uvicorn main:app --host 0.0.0.0 --port 8000 > ../app.log 2>&1 &
+
+          echo "Deployment script completed."
