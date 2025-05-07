@@ -3,7 +3,9 @@ Crawl4ai Web Crawler for DreamShift-Assist
 
 ## Step 1: Create and activate a virtual environment
 python -m venv venv
+
 source venv/bin/activate      # On Linux/macOS
+
 venv\Scripts\activate         # On Windows
 
 ## Step 2: Install dependencies
