@@ -46,7 +46,7 @@ resource "aws_instance" "example" {
   ami           = "ami-084568db4383264d4"  # Ubuntu machine
   instance_type = "t2.micro"              # Free tier eligible
   key_name = "drmshft_fastapi"
-  security_groups = [ aws_security_group.dreamshift_sg.name ]
+  security_groups = [ aws_security_group.crawler_sg.name ]
 
   root_block_device {
     volume_size = 6  # 24 GB disk
