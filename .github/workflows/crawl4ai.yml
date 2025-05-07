@@ -92,6 +92,8 @@ jobs:
           # clone the repository using the GitHub PAT
           git clone https://github.com/Pulina-176/DRMSHFT_Crawl4ai.git
 
+          cd DRMSHFT_Crawl4ai
+
           python3 -m venv venv
           source venv/bin/activate
 
