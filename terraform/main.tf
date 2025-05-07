@@ -49,7 +49,7 @@ resource "aws_instance" "example" {
   security_groups = [ aws_security_group.crawler_sg.name ]
 
   root_block_device {
-    volume_size = 6  # 24 GB disk
+    volume_size = 8  # 24 GB disk
     volume_type = "gp3"
   }
 
