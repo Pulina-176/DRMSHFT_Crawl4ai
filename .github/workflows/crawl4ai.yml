@@ -97,6 +97,14 @@ jobs:
 
           cd DRMSHFT_Crawl4ai
 
+          # copy the secrets to the .env file
+          touch .env
+          echo "PROXY_SERVER=${{ secrets.PROXY_SERVER }}" | cat > .env
+          echo "PROXY_USERNAME=${{ secrets.PROXY_USERNAME }}" | cat >> .env
+          echo "PROXY_PASSWORD=${{ secrets.PROXY_PASSWORD }}" | cat >> .env
+          echo "LLM_API_TOKEN=${{ secrets.LLM_API_TOKEN }}" | cat >> .env
+
+
           python3 -m venv venv
           source venv/bin/activate
 
