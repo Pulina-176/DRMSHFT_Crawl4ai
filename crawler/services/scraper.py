@@ -39,5 +39,7 @@ async def crawler(role: str = "software engineer", location: str = "Colombo, Sri
         print(f"Parsed Markdown data:\n{result.markdown[:1000]}")
         print(f"Response status code: {result.status_code}")
 
+        return result.markdown[:1000]
+
 if __name__ == "__main__":
     asyncio.run(crawler())
